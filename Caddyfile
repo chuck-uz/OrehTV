@@ -1,0 +1,78 @@
+# Единственный вход бэкенда TVOREH. Только домашняя сеть; через CT103 (tv.home.oresh.in) — лишь админка.
+# Ключ TMDB — файл secrets/tmdb.key (его пишет мастер /setup или админка); пароль админки — у API (data/admin.json).
+{
+	admin off
+	auto_https off
+}
+
+:80 {
+	# Журнал запросов (JSON в docker logs): статусы /video и /tv/debrid/play для разбора обрывов.
+	log {
+		output stdout
+		format json
+	}
+	encode zstd gzip
+	request_body {
+		max_size 64KB
+	}
+
+	# Внешний прокси (CT103) — только /admin/* (у него свой пароль ниже); всё для ТВ — только из LAN.
+	@outsideTv {
+		remote_ip 192.168.88.26
+		not path /admin/*
+	}
+	handle @outsideTv {
+		respond "только дома" 403
+	}
+
+	# Админка и документация API — за паролем, его проверяет сам API (basic auth; пароль задаёт мастер /setup).
+	handle /admin/* {
+		reverse_proxy api:8000
+	}
+
+	# TMDB через нас: ключ подставляет сервер, в APK его нет. Картинки — тоже здесь (/tmdb/img/*).
+	@tmdbApi path /tmdb/api/*
+	handle @tmdbApi {
+		forward_auth api:8000 {
+			uri /auth
+		}
+		uri strip_prefix /tmdb/api
+		rewrite * {path}?{query}&api_key={file./secrets/tmdb.key}
+		reverse_proxy https://api.themoviedb.org {
+			header_up Host api.themoviedb.org
+			header_up -X-Device
+		}
+	}
+	@tmdbImg path /tmdb/img/*
+	handle @tmdbImg {
+		uri strip_prefix /tmdb/img
+		reverse_proxy https://image.tmdb.org {
+			header_up Host image.tmdb.org
+			header_up -X-Device
+		}
+	}
+
+	# Видео: TorrServer только через нас и только с ключом устройства. Большие ответы, без буферизации.
+	handle /video/* {
+		forward_auth api:8000 {
+			uri /auth
+		}
+		uri strip_prefix /video
+		reverse_proxy torrserver:8090 {
+			flush_interval -1
+			transport http {
+				read_timeout 1h
+			}
+		}
+	}
+
+	# Всё остальное — API (ключ устройства проверяет оно само).
+	handle {
+		reverse_proxy api:8000 {
+			flush_interval -1
+			transport http {
+				read_timeout 1h
+			}
+		}
+	}
+}

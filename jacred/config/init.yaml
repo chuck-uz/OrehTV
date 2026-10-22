@@ -1,0 +1,46 @@
+# JacRed standalone (ghcr.io/jacred-fdb/jacred) для TVOREH — режим синхронизации.
+# База приходит с sync.jacred.stream (rutracker, kinozal, rutor, nnmclub, megapeer, selezen, bitru…), свежесть —
+# timeSync минут. Собственный парсинг трекеров не включён: JacRed не запускает парсеры сам, их дёргает внешний cron
+# (/cron/{slug}/parse), а nnmclub и megapeer в синке уже есть. Toloka (укр.) — исключена: правило проекта (CLAUDE.md).
+# Rutracker/Kinozal напрямую — только через FlareSolverr (Chromium) — не используем, см. docs/backend-design.md, Q3.
+listenip: any
+listenport: 9117
+apikey: ""        # доступ ограничивает Caddy; если задать — то же в .env JACRED_APIKEY
+devkey: ""
+web: false        # веб-редактор конфига не нужен
+openstats: false
+opensync: false
+
+flaresolverr:
+  enable: false
+cffetch:
+  enable: false
+tracks: false
+
+syncapi: https://sync.jacred.stream
+timeSync: 30
+timeSyncSpidr: 360
+synctrackers:
+  - anidub
+  - anifilm
+  - aniliberty
+  - animelayer
+  - baibako
+  - bitru
+  - kinozal
+  - lostfilm
+  - megapeer
+  - nnmclub
+  - rutor
+  - rutracker
+  - selezen
+  - torrentby
+disable_trackers:
+  - toloka
+
+maxreadfile: 1000     # по умолчанию 250 — резало выдачу (Lampac отдаёт до 900 по «Матрице»)
+mergeduplicates: true
+mergenumduplicates: true
+logFdb: false       # true пишет каждую запись в Data/log — 10 ГБ за два часа первичного синка
+logFdbRetentionDays: 7
+logParsers: false

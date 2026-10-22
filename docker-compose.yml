@@ -1,0 +1,103 @@
+# Бэкенд TVOREH «из коробки» — LXC 104 на Proxmox (192.168.88.40). Четыре контейнера, одна сеть:
+#   caddy      — единственный вход (:80): ключ устройства на всё, TMDB-ключ, админка за паролем
+#   api        — наш сервис (FastAPI): поиск через JacRed, TorBox, IMDb, описания, журнал, подборки, APK
+#   jacred     — индекс раздач (standalone, синк с sync.jacred.stream + NNMClub/Megapeer)
+#   torrserver — видео; наружу не публикуется, ТВ ходит через Caddy (/video/*)
+# Переезд (docs/backend-design.md): сначала рядом со старым стеком на :81 (PORT=81 в .env), потом :80.
+name: tvoreh
+services:
+  caddy:
+    image: caddy:2.11.7
+    container_name: tvoreh-caddy
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE, DAC_READ_SEARCH]   # DAC_READ_SEARCH — прочитать secrets/tmdb.key (600, владелец 1000)
+    mem_limit: 256m
+    ports: ["${PORT:-80}:80"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./secrets:/secrets:ro   # tmdb.key подставляется в /tmdb/api/* ({file./secrets/tmdb.key})
+    depends_on: [api]
+    logging:
+      options: { max-size: "5m", max-file: "3" }
+
+  api:
+    image: ${API_IMAGE:-ghcr.io/chuck-uz/tvoreh-api:latest}
+    container_name: tvoreh-api
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    user: "1000:1000"
+    mem_limit: 512m
+    environment:
+      TVOREH_DATA: /data
+      TVOREH_SECRETS: /secrets
+      JACRED_URL: http://jacred:9117
+      JACRED_APIKEY: ${JACRED_APIKEY:-}
+      TORRSERVER_URL: http://torrserver:8090
+      TMDB_KEY: ${TMDB_KEY:-}            # только для переезда со старой схемы: при старте уходит в secrets/tmdb.key
+      ADMIN_HASH: ${ADMIN_HASH:-}        # то же: хеш из .env → data/admin.json, дальше пароль меняет админка
+      SHELVES_AT: "05:15"
+      TZ: ${TZ:-UTC}
+      SERVER_NAME: ${SERVER_NAME:-TVOREH}          # имя в автопоиске на ТВ
+      PUBLIC_PORT: ${PORT:-80}
+      SHOWCASE_REPO: ${SHOWCASE_REPO:-chuck-uz/OrehTV}
+      UPDATES_CHANNEL: ${UPDATES_CHANNEL:-release}  # release — основные релизы; prerelease — и предварительные (наш сервер)
+      SNAPSHOT_PUBLISH: ${SNAPSHOT_PUBLISH:-0}      # 1 только у нас: еженедельный снимок базы JacRed на витрину (secrets/github.key)
+    volumes:
+      - ./data:/data
+      - ./secrets:/secrets
+      - ./jacred/data:/data/jacred:ro   # размер базы в админке
+    logging:
+      options: { max-size: "5m", max-file: "3" }
+
+  # Автопоиск: приложение шлёт UDP-бродкаст «TVOREH?» на 46911, ответчик отвечает именем и портом сервера.
+  # Отдельный контейнер в сети хоста: бродкаст через опубликованный порт до контейнера не доходит.
+  # Windows (Docker Desktop) host-сеть не поддерживает — там адрес сервера вводят в приложении руками.
+  discovery:
+    image: ${API_IMAGE:-ghcr.io/chuck-uz/tvoreh-api:latest}
+    container_name: tvoreh-discovery
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    user: "1000:1000"
+    mem_limit: 64m
+    network_mode: host
+    profiles: ["linux"]   # COMPOSE_PROFILES=linux в .env; на Windows (Docker Desktop) host-сети нет — контейнер не нужен
+    command: ["python", "-m", "api.discovery"]
+    healthcheck: { disable: true }   # проверка образа (/health на :8000) к ответчику не относится
+    environment:
+      SERVER_NAME: ${SERVER_NAME:-TVOREH}
+      PUBLIC_PORT: ${PORT:-80}
+    logging:
+      options: { max-size: "1m", max-file: "2" }
+
+  jacred:
+    image: ghcr.io/jacred-fdb/jacred:latest
+    container_name: tvoreh-jacred
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    mem_limit: 2g   # 1g не хватало: синк падал по OOM на странице с 20 тыс. раздач (nhl)
+    volumes:
+      - ./jacred/config:/app/config    # init.yaml
+      - ./jacred/data:/app/Data        # база (FileDB) и логи
+    logging:
+      options: { max-size: "5m", max-file: "3" }
+
+  torrserver:
+    image: ghcr.io/yourok/torrserver:latest
+    container_name: tvoreh-torrserver
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    mem_limit: 2g
+    environment:
+      TS_PORT: "8090"
+      TS_DONTKILL: "1"
+      TS_HTTPAUTH: "0"
+      TS_CONF_PATH: /opt/ts/config
+      TS_TORR_DIR: /opt/ts/torrents
+    volumes:
+      - ./torrserver:/opt/ts
+    # Порт пиров: 42069 tcp/udp наружу через роутер не пробрасываем (UPnP выключен в настройках).
+    ports: ["42069:42069", "42069:42069/udp"]
+    logging:
+      options: { max-size: "5m", max-file: "3" }
