@@ -28,7 +28,7 @@ services:
     restart: unless-stopped
     security_opt: [no-new-privileges:true]
     user: "1000:1000"
-    mem_limit: 512m
+    mem_limit: 2g   # API ~350 МБ + сборка подборок до ~1 ГБ в том же контейнере; при 1g ядро убивало обоих
     environment:
       TVOREH_DATA: /data
       TVOREH_SECRETS: /secrets
