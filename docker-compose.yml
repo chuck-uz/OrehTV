@@ -76,7 +76,7 @@ services:
     container_name: tvoreh-jacred
     restart: unless-stopped
     security_opt: [no-new-privileges:true]
-    mem_limit: 2g   # 1g не хватало: синк падал по OOM на странице с 20 тыс. раздач (nhl)
+    mem_limit: 3g   # 1g не хватало: синк падал по OOM на странице с 20 тыс. раздач (nhl); 2g доходило до 1,96 (23.10)
     volumes:
       - ./jacred/config:/app/config    # init.yaml
       - ./jacred/data:/app/Data        # база (FileDB) и логи
