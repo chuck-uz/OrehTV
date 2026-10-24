@@ -75,6 +75,12 @@ Say "Запуск контейнеров (первый раз — скачива
 docker compose pull -q
 docker compose up -d
 if ($LASTEXITCODE -ne 0) { Die "контейнеры не запустились — смотрите: docker compose logs" }
+# Автообновление сервера: раз в сутки ночью свежий образ api (задача планировщика текущего пользователя —
+# Docker Desktop работает в его сеансе). Минута случайная, чтобы серверы друзей не ходили в ghcr.io все разом.
+$at = "04:{0:D2}" -f (Get-Random -Maximum 60)
+schtasks /Create /F /SC DAILY /ST $at /TN "OrehTV update" /TR "cmd /c cd /d `"$Dir`" && docker compose pull -q api && docker compose up -d >> update.log 2>&1" | Out-Null
+if ($LASTEXITCODE -eq 0) { Write-Host "Автообновление: каждую ночь в $at (Планировщик заданий → OrehTV update)." }
+else { Write-Host "Задача автообновления не создалась — обновлять вручную: docker compose pull; docker compose up -d" }
 $port = (Get-Content .env | Where-Object { $_ -match "^PORT=" }) -replace "PORT=", ""
 $ok = $false
 for ($i = 0; $i -lt 30 -and -not $ok; $i++) { try { Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:$port/health" *> $null; $ok = $true } catch { Start-Sleep 2 } }
