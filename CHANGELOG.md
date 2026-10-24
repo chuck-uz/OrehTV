@@ -1,6 +1,6 @@
 # История изменений
 
-Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/). Версия приложения `0.1.N` — номер сборки.
+Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/). Версия приложения `MAJOR.MINOR.N`, `N` — номер сборки (до 0.9 версии были `0.1.N`).
 
 ## [Не выпущено]
 
