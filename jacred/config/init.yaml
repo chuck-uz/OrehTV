@@ -38,7 +38,7 @@ synctrackers:
 disable_trackers:
   - toloka
 
-maxreadfile: 1000     # по умолчанию 250 — резало выдачу (Lampac отдаёт до 900 по «Матрице»)
+maxreadfile: 1000     # по умолчанию 250 — резало выдачу (по «Матрице» раздач бывает до 900)
 mergeduplicates: true
 mergenumduplicates: true
 logFdb: false       # true пишет каждую запись в Data/log — 10 ГБ за два часа первичного синка
