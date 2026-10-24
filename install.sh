@@ -54,12 +54,20 @@ EOF
 fi
 
 # --- снимок базы раздач -----------------------------------------------------------------------------------------------
-if [ ! -f jacred/data/masterDb.bz ] && [ -t 0 ]; then
+# При «curl … | bash» stdin — это сам скрипт, поэтому спрашиваем через /dev/tty; без терминала — TVOREH_SNAPSHOT (по умолчанию да).
+if [ ! -f jacred/data/masterDb.bz ]; then
   say "База раздач"
-  echo "Без снимка база соберётся сама примерно за сутки (всё это время поиск неполный). Снимок — около 2,5 ГБ."
-  read -r -p "Скачать снимок базы? [Y/n] " ans </dev/tty || ans=y
+  echo "Без снимка база соберётся сама примерно за сутки (всё это время поиск неполный). Снимок — около 2 ГБ."
+  ans=${TVOREH_SNAPSHOT:-}
+  if [ -z "$ans" ] && { : </dev/tty; } 2>/dev/null; then read -r -p "Скачать снимок базы? [Y/n] " ans </dev/tty || ans=y; fi
+  ans=${ans:-y}
   if [ "${ans:-y}" != "n" ] && [ "${ans:-y}" != "N" ]; then
-    tag=$(curl -fsSL "https://api.github.com/repos/$REPO/releases?per_page=30" | awk -F'"' '/"tag_name": "jacred-base-/ {print $4; exit}')
+    # GitHub сортирует релизы по дате коммита тега, а не публикации: снимок может оказаться за сотней сборок — листаем.
+    tag=""
+    for page in 1 2 3 4 5; do
+      tag=$(curl -fsSL "https://api.github.com/repos/$REPO/releases?per_page=100&page=$page" | awk -F'"' '/"tag_name": "jacred-base-/ {print $4}' | sort -r | head -1) || tag=""
+      [ -n "$tag" ] && break
+    done
     if [ -z "$tag" ]; then echo "Снимка на витрине пока нет — база соберётся сама."; else
       parts=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/tags/$tag" | awk -F'"' '/"browser_download_url"/ && /jacred-base\.tar\.part/ {print $4}' | sort)
       tmp=$(mktemp -d); n=0
@@ -72,7 +80,8 @@ if [ ! -f jacred/data/masterDb.bz ] && [ -t 0 ]; then
 fi
 
 # --- код мастера, права, запуск ---------------------------------------------------------------------------------------
-code=$(tr -dc 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' </dev/urandom | head -c 6)
+# Конечный кусок /dev/urandom: «tr </dev/urandom | head» под pipefail падает с SIGPIPE и роняет весь скрипт.
+code=$(head -c 512 /dev/urandom | LC_ALL=C tr -dc 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' | cut -c1-6)
 printf '%s' "$code" | $SUDO tee data/setup-code >/dev/null
 $SUDO chown -R 1000:1000 data secrets jacred/data torrserver
 $SUDO chmod 600 data/setup-code
@@ -83,7 +92,9 @@ port=$(grep -E '^PORT=' .env | cut -d= -f2)
 for i in $(seq 1 30); do curl -fsS -o /dev/null "http://127.0.0.1:$port/health" 2>/dev/null && break; sleep 2; done
 curl -fsS -o /dev/null "http://127.0.0.1:$port/health" || die "сервер не поднялся — смотрите: docker compose -f $DIR/docker-compose.yml logs api"
 
-ips=$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)' | head -3 | tr '\n' ' ')
+# Адрес основного интерфейса (маршрут наружу): hostname -I выдаёт ещё и сети Docker (172.17.0.1 …), они только путают.
+ips=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") print $(i + 1)}')
+[ -n "$ips" ] || ips=$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^(10\.|192\.168\.)' | head -1) || true
 say "Готово"
 echo "Сервер работает. Откройте в браузере мастер первого запуска:"
 for ip in ${ips:-127.0.0.1}; do echo "    http://$ip${port:+$( [ "$port" = 80 ] || echo ":$port")}/setup"; done

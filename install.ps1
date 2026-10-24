@@ -48,8 +48,13 @@ if (-not (Test-Path "jacred\data\masterDb.bz")) {
   Write-Host "Без снимка база соберётся сама примерно за сутки (всё это время поиск неполный). Снимок — около 2,5 ГБ."
   $ans = Read-Host "Скачать снимок базы? [Y/n]"
   if ($ans -ne "n" -and $ans -ne "N") {
-    $rels = Invoke-RestMethod "https://api.github.com/repos/$Repo/releases?per_page=30"
-    $snap = $rels | Where-Object { $_.tag_name -like "jacred-base-*" } | Select-Object -First 1
+    # GitHub сортирует релизы по дате коммита тега: снимок может оказаться за сотней сборок — листаем страницы.
+    $snap = $null
+    foreach ($page in 1..5) {
+      $rels = Invoke-RestMethod "https://api.github.com/repos/$Repo/releases?per_page=100&page=$page"
+      $snap = $rels | Where-Object { $_.tag_name -like "jacred-base-*" } | Sort-Object tag_name -Descending | Select-Object -First 1
+      if ($snap -or -not $rels) { break }
+    }
     if (-not $snap) { Write-Host "Снимка на витрине пока нет — база соберётся сама." } else {
       $tmp = Join-Path $env:TEMP "orehtv-snapshot"; New-Item -ItemType Directory -Force -Path $tmp | Out-Null
       $parts = $snap.assets | Where-Object { $_.name -like "jacred-base.tar.part*" } | Sort-Object name
