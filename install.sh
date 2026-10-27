@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Установка сервера OrehTV на Linux с Docker одной командой:
+# Установка сервера TVOREH на Linux с Docker одной командой:
 #   curl -fsSL https://raw.githubusercontent.com/chuck-uz/OrehTV/main/install.sh | bash
 # Что делает: проверяет Docker, память и диск; кладёт файлы в /opt/tvoreh (или $TVOREH_DIR); по желанию скачивает
 # снимок базы раздач (~2,5 ГБ, иначе база соберётся сама за сутки); запускает контейнеры; печатает адрес и код мастера.
@@ -13,7 +13,7 @@ FILES="docker-compose.yml Caddyfile .env.example jacred/config/init.yaml"
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 die() { printf '\n\033[31mОшибка:\033[0m %s\n' "$*" >&2; exit 1; }
 
-say "OrehTV — установка сервера"
+say "TVOREH — установка сервера"
 
 # --- проверки -------------------------------------------------------------------------------------------------------
 [ "$(id -u)" = 0 ] || SUDO="sudo"; SUDO="${SUDO:-}"
@@ -43,10 +43,10 @@ done
 if [ ! -f .env ]; then
   tz=$(timedatectl show -p Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null || echo UTC)
   $SUDO tee .env >/dev/null <<EOF
-# OrehTV — настройки сервера. Пароль админки и ключи задаются в мастере (http://<адрес>/setup) и в админке.
+# TVOREH — настройки сервера. Пароль админки и ключи задаются в мастере (http://<адрес>/setup) и в админке.
 PORT=$PORT_DEFAULT
 TZ=${tz:-UTC}
-SERVER_NAME=$(hostname -s 2>/dev/null || echo OrehTV)
+SERVER_NAME=$(hostname -s 2>/dev/null || echo TVOREH)
 UPDATES_CHANNEL=release
 COMPOSE_PROFILES=linux
 EOF
@@ -91,7 +91,7 @@ $SUDO docker compose up -d
 # Автообновление сервера: раз в сутки ночью свежий образ api; up -d пересоздаёт только то, у чего образ сменился.
 # Минута случайная — чтобы серверы друзей не ходили в ghcr.io все разом.
 if [ -d /etc/cron.d ]; then
-  printf '%s\n' "# OrehTV: ежедневное обновление сервера (ставит install.sh). Журнал — $DIR/update.log" \
+  printf '%s\n' "# TVOREH: ежедневное обновление сервера (ставит install.sh). Журнал — $DIR/update.log" \
     "$((RANDOM % 60)) 4 * * * root cd $DIR && { date; docker compose pull -q api && docker compose up -d; } >> $DIR/update.log 2>&1" \
     | $SUDO tee /etc/cron.d/orehtv-update >/dev/null
   $SUDO chmod 644 /etc/cron.d/orehtv-update

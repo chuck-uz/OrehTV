@@ -1,4 +1,4 @@
-# Установка сервера OrehTV на Windows с Docker Desktop одной командой (PowerShell):
+# Установка сервера TVOREH на Windows с Docker Desktop одной командой (PowerShell):
 #   irm https://raw.githubusercontent.com/chuck-uz/OrehTV/main/install.ps1 | iex
 # Что делает: проверяет Docker Desktop, кладёт файлы в %USERPROFILE%\OrehTV (или $env:TVOREH_DIR), по желанию
 # скачивает снимок базы раздач (~2,5 ГБ), запускает контейнеры, печатает адрес и код мастера.
@@ -12,7 +12,7 @@ $Files = @("docker-compose.yml", "Caddyfile", ".env.example", "jacred/config/ini
 function Say($t) { Write-Host "`n$t" -ForegroundColor White }
 function Die($t) { Write-Host "`nОшибка: $t" -ForegroundColor Red; exit 1 }
 
-Say "OrehTV — установка сервера"
+Say "TVOREH — установка сервера"
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Die "нужен Docker Desktop: https://www.docker.com/products/docker-desktop/ (после установки запустите его и повторите)" }
 try { docker info *> $null } catch { Die "Docker Desktop не запущен" }
 if ($LASTEXITCODE -ne 0) { Die "Docker Desktop не запущен" }
@@ -35,7 +35,7 @@ foreach ($f in $Files) {
 if (-not (Test-Path ".env")) {
   $tz = try { (Get-TimeZone).Id } catch { "UTC" }
   @"
-# OrehTV — настройки сервера. Пароль админки и ключи задаются в мастере (http://<адрес>/setup) и в админке.
+# TVOREH — настройки сервера. Пароль админки и ключи задаются в мастере (http://<адрес>/setup) и в админке.
 PORT=$portDefault
 TZ=UTC
 SERVER_NAME=$env:COMPUTERNAME
