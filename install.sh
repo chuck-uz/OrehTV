@@ -88,11 +88,11 @@ $SUDO chmod 600 data/setup-code
 say "Запуск контейнеров (первый раз — скачивание образов, несколько минут)"
 $SUDO docker compose pull -q
 $SUDO docker compose up -d
-# Автообновление сервера: раз в сутки ночью свежий образ api; up -d пересоздаёт только то, у чего образ сменился.
+# Автообновление сервера: раз в сутки ночью свежие образы api и TorrServer; up -d пересоздаёт только то, у чего образ сменился.
 # Минута случайная — чтобы серверы друзей не ходили в ghcr.io все разом.
 if [ -d /etc/cron.d ]; then
   printf '%s\n' "# TVOREH: ежедневное обновление сервера (ставит install.sh). Журнал — $DIR/update.log" \
-    "$((RANDOM % 60)) 4 * * * root cd $DIR && { date; docker compose pull -q api && docker compose up -d; } >> $DIR/update.log 2>&1" \
+    "$((RANDOM % 60)) 4 * * * root cd $DIR && { date; docker compose pull -q api torrserver && docker compose up -d; } >> $DIR/update.log 2>&1" \
     | $SUDO tee /etc/cron.d/orehtv-update >/dev/null
   $SUDO chmod 644 /etc/cron.d/orehtv-update
   echo "Автообновление: каждую ночь в 04:xx (/etc/cron.d/orehtv-update)."
