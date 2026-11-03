@@ -78,7 +78,7 @@ if ($LASTEXITCODE -ne 0) { Die "контейнеры не запустились
 # Автообновление сервера: раз в сутки ночью свежие образы api и TorrServer (задача планировщика текущего пользователя —
 # Docker Desktop работает в его сеансе). Минута случайная, чтобы серверы друзей не ходили в ghcr.io все разом.
 $at = "04:{0:D2}" -f (Get-Random -Maximum 60)
-schtasks /Create /F /SC DAILY /ST $at /TN "OrehTV update" /TR "cmd /c cd /d `"$Dir`" && docker compose pull -q api torrserver && docker compose up -d >> update.log 2>&1" | Out-Null
+schtasks /Create /F /SC DAILY /ST $at /TN "OrehTV update" /TR "cmd /c cd /d `"$Dir`" && docker compose pull -q api torrserver jacred && docker compose up -d >> update.log 2>&1" | Out-Null
 if ($LASTEXITCODE -eq 0) { Write-Host "Автообновление: каждую ночь в $at (Планировщик заданий → OrehTV update)." }
 else { Write-Host "Задача автообновления не создалась — обновлять вручную: docker compose pull; docker compose up -d" }
 $port = (Get-Content .env | Where-Object { $_ -match "^PORT=" }) -replace "PORT=", ""
